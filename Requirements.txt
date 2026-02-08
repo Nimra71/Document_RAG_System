@@ -1,0 +1,13 @@
+gradio
+sentence-transformers
+faiss-cpu
+pypdf
+transformers
+unsloth
+torch
+matplotlib
+
+Optional (if using GPU):
+
+faiss-gpu
+torch --extra-index-url https://download.pytorch.org/whl/cu118
