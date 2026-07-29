@@ -9,6 +9,8 @@ Endpoints:
   GET  /health                — health check for deployment monitoring
 """
 from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from app.document_processor import extract_text_from_pdf, detect_document_type, chunk_text
@@ -21,6 +23,15 @@ app = FastAPI(
     description="Upload a PDF, ask questions, get grounded answers with citations.",
     version="2.0.0",
 )
+
+# Serve the frontend (index.html + any future assets) at the root URL,
+# while API endpoints below stay reachable at their own paths.
+app.mount("/static", StaticFiles(directory="app/static"), name="static")
+
+
+@app.get("/")
+def serve_frontend():
+    return FileResponse("app/static/index.html")
 
 
 class Question(BaseModel):

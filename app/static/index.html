@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Document RAG System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #12151A;
+    --surface: #1B1F27;
+    --surface-hover: #232833;
+    --border: #2A303C;
+    --text: #EDEAE3;
+    --text-muted: #8B92A3;
+    --accent: #5EEAD4;
+    --accent-dim: #2C4A47;
+    --highlight: #F4C95D;
+    --error: #E8735C;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    min-height: 100vh;
+  }
+
+  .topbar {
+    padding: 20px 32px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+  }
+
+  .topbar h1 {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    margin: 0;
+    text-transform: uppercase;
+  }
+
+  .topbar .tagline {
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+
+  .layout {
+    display: grid;
+    grid-template-columns: 340px 1fr;
+    min-height: calc(100vh - 65px);
+  }
+
+  @media (max-width: 800px) {
+    .layout { grid-template-columns: 1fr; }
+  }
+
+  /* LEFT PANEL — the document */
+  .doc-panel {
+    border-right: 1px solid var(--border);
+    padding: 28px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .panel-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+  .dropzone {
+    border: 1.5px dashed var(--border);
+    border-radius: 4px;
+    padding: 32px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.15s ease, background 0.15s ease;
+  }
+
+  .dropzone:hover, .dropzone.dragover {
+    border-color: var(--accent);
+    background: var(--accent-dim);
+  }
+
+  .dropzone-icon {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 22px;
+    color: var(--accent);
+    margin-bottom: 8px;
+  }
+
+  .dropzone-text {
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+
+  .dropzone-text strong {
+    color: var(--text);
+  }
+
+  #fileInput { display: none; }
+
+  .doc-status {
+    display: none;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 14px 16px;
+  }
+
+  .doc-status.active { display: block; }
+
+  .doc-status .filename {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--accent);
+    word-break: break-all;
+  }
+
+  .doc-status .meta {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 6px;
+    line-height: 1.6;
+  }
+
+  .doc-status .type-tag {
+    display: inline-block;
+    background: var(--accent-dim);
+    color: var(--accent);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 3px;
+    margin-top: 6px;
+    letter-spacing: 0.03em;
+  }
+
+  .action-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    padding: 10px 14px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    width: 100%;
+  }
+
+  .action-btn:hover:not(:disabled) {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .action-btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+
+  /* RIGHT PANEL — the conversation */
+  .chat-panel {
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 65px);
+  }
+
+  .thread {
+    flex: 1;
+    overflow-y: auto;
+    padding: 28px 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .empty-state {
+    margin: auto;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 13px;
+    max-width: 320px;
+  }
+
+  .empty-state .big {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    color: var(--text);
+    margin-bottom: 8px;
+  }
+
+  .msg-question {
+    align-self: flex-end;
+    max-width: 70%;
+    background: var(--accent-dim);
+    color: var(--text);
+    padding: 10px 16px;
+    border-radius: 10px 10px 2px 10px;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  .msg-answer {
+    align-self: flex-start;
+    max-width: 78%;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .msg-answer .bubble {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 14px 16px;
+    border-radius: 10px 10px 10px 2px;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  .citations {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    padding-left: 4px;
+  }
+
+  .citation-tab {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10.5px;
+    background: transparent;
+    border: 1px solid var(--highlight);
+    color: var(--highlight);
+    padding: 3px 8px;
+    border-radius: 3px 3px 0 0;
+    border-bottom: 2px solid var(--highlight);
+  }
+
+  .composer {
+    border-top: 1px solid var(--border);
+    padding: 18px 32px 24px;
+    display: flex;
+    gap: 10px;
+  }
+
+  #questionInput {
+    flex: 1;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    padding: 12px 14px;
+    border-radius: 6px;
+    outline: none;
+    transition: border-color 0.15s ease;
+  }
+
+  #questionInput:focus { border-color: var(--accent); }
+  #questionInput::placeholder { color: var(--text-muted); }
+  #questionInput:disabled { opacity: 0.5; }
+
+  .send-btn {
+    background: var(--accent);
+    color: var(--bg);
+    border: none;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    padding: 0 20px;
+    border-radius: 6px;
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: opacity 0.15s ease;
+  }
+
+  .send-btn:hover:not(:disabled) { opacity: 0.85; }
+  .send-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+  .thinking {
+    align-self: flex-start;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .dot {
+    width: 4px; height: 4px;
+    background: var(--accent);
+    border-radius: 50%;
+    animation: pulse 1.2s infinite ease-in-out;
+  }
+  .dot:nth-child(2) { animation-delay: 0.2s; }
+  .dot:nth-child(3) { animation-delay: 0.4s; }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 0.2; }
+    50% { opacity: 1; }
+  }
+
+  .error-msg {
+    align-self: flex-start;
+    color: var(--error);
+    font-size: 13px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  ::-webkit-scrollbar { width: 8px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1>📄 Document RAG System</h1>
+  <span class="tagline">Ask questions about any PDF — grounded answers, cited sources</span>
+</div>
+
+<div class="layout">
+  <div class="doc-panel">
+    <div>
+      <div class="panel-label" style="margin-bottom: 10px;">Document</div>
+      <div class="dropzone" id="dropzone">
+        <div class="dropzone-icon">⇪</div>
+        <div class="dropzone-text"><strong>Click to upload</strong><br>or drag a PDF here</div>
+      </div>
+      <input type="file" id="fileInput" accept="application/pdf">
+    </div>
+
+    <div class="doc-status" id="docStatus">
+      <div class="filename" id="docFilename"></div>
+      <div class="meta" id="docMeta"></div>
+      <span class="type-tag" id="docType"></span>
+    </div>
+
+    <button class="action-btn" id="summarizeBtn" disabled>Summarize document</button>
+  </div>
+
+  <div class="chat-panel">
+    <div class="thread" id="thread">
+      <div class="empty-state">
+        <div class="big">// no document loaded</div>
+        Upload a PDF on the left, then ask anything about it — the system retrieves and re-ranks the most relevant sections before answering.
+      </div>
+    </div>
+
+    <div class="composer">
+      <input type="text" id="questionInput" placeholder="Upload a document first..." disabled>
+      <button class="send-btn" id="sendBtn" disabled>Ask</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const API_BASE = window.location.origin;
+  const sessionId = 'session_' + Math.random().toString(36).slice(2, 10);
+
+  const dropzone = document.getElementById('dropzone');
+  const fileInput = document.getElementById('fileInput');
+  const docStatus = document.getElementById('docStatus');
+  const docFilename = document.getElementById('docFilename');
+  const docMeta = document.getElementById('docMeta');
+  const docType = document.getElementById('docType');
+  const summarizeBtn = document.getElementById('summarizeBtn');
+  const thread = document.getElementById('thread');
+  const questionInput = document.getElementById('questionInput');
+  const sendBtn = document.getElementById('sendBtn');
+
+  let documentReady = false;
+
+  dropzone.addEventListener('click', () => fileInput.click());
+  dropzone.addEventListener('dragover', (e) => { e.preventDefault(); dropzone.classList.add('dragover'); });
+  dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
+  dropzone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropzone.classList.remove('dragover');
+    if (e.dataTransfer.files.length) uploadFile(e.dataTransfer.files[0]);
+  });
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files.length) uploadFile(fileInput.files[0]);
+  });
+
+  async function uploadFile(file) {
+    if (!file.name.toLowerCase().endsWith('.pdf')) {
+      alert('Please upload a PDF file.');
+      return;
+    }
+    dropzone.querySelector('.dropzone-text').innerHTML = '<strong>Uploading & indexing...</strong>';
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const res = await fetch(`${API_BASE}/upload/${sessionId}`, { method: 'POST', body: formData });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Upload failed');
+
+      docFilename.textContent = file.name;
+      docMeta.textContent = `${data.chunk_count} chunks indexed`;
+      docType.textContent = data.detected_type;
+      docStatus.classList.add('active');
+
+      documentReady = true;
+      questionInput.disabled = false;
+      questionInput.placeholder = 'Ask something about this document...';
+      sendBtn.disabled = false;
+      summarizeBtn.disabled = false;
+
+      thread.innerHTML = `<div class="empty-state"><div class="big">// document ready</div>Ask your first question below.</div>`;
+    } catch (err) {
+      alert('Upload failed: ' + err.message);
+    } finally {
+      dropzone.querySelector('.dropzone-text').innerHTML = '<strong>Click to upload</strong><br>or drag a PDF here';
+    }
+  }
+
+  function addQuestionBubble(question) {
+    if (thread.querySelector('.empty-state')) thread.innerHTML = '';
+    const el = document.createElement('div');
+    el.className = 'msg-question';
+    el.textContent = question;
+    thread.appendChild(el);
+    thread.scrollTop = thread.scrollHeight;
+  }
+
+  function addThinkingIndicator() {
+    const el = document.createElement('div');
+    el.className = 'thinking';
+    el.id = 'thinkingIndicator';
+    el.innerHTML = 'retrieving & generating <span class="dot"></span><span class="dot"></span><span class="dot"></span>';
+    thread.appendChild(el);
+    thread.scrollTop = thread.scrollHeight;
+    return el;
+  }
+
+  function addAnswerBubble(answer, sources) {
+    const wrap = document.createElement('div');
+    wrap.className = 'msg-answer';
+
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble';
+    bubble.textContent = answer;
+    wrap.appendChild(bubble);
+
+    thread.appendChild(wrap);
+    thread.scrollTop = thread.scrollHeight;
+  }
+
+  function addErrorBubble(message) {
+    const el = document.createElement('div');
+    el.className = 'error-msg';
+    el.textContent = '⚠ ' + message;
+    thread.appendChild(el);
+    thread.scrollTop = thread.scrollHeight;
+  }
+
+  async function askQuestion() {
+    const question = questionInput.value.trim();
+    if (!question || !documentReady) return;
+
+    addQuestionBubble(question);
+    questionInput.value = '';
+    sendBtn.disabled = true;
+    const thinkingEl = addThinkingIndicator();
+
+    try {
+      const res = await fetch(`${API_BASE}/ask/${sessionId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question })
+      });
+      const data = await res.json();
+      thinkingEl.remove();
+      if (!res.ok) throw new Error(data.detail || 'Something went wrong');
+      addAnswerBubble(data.answer, data.sources);
+    } catch (err) {
+      thinkingEl.remove();
+      addErrorBubble(err.message);
+    } finally {
+      sendBtn.disabled = false;
+      questionInput.focus();
+    }
+  }
+
+  sendBtn.addEventListener('click', askQuestion);
+  questionInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') askQuestion();
+  });
+
+  summarizeBtn.addEventListener('click', async () => {
+    if (!documentReady) return;
+    addQuestionBubble('Summarize this document');
+    summarizeBtn.disabled = true;
+    const thinkingEl = addThinkingIndicator();
+    try {
+      const res = await fetch(`${API_BASE}/summarize/${sessionId}`, { method: 'POST' });
+      const data = await res.json();
+      thinkingEl.remove();
+      if (!res.ok) throw new Error(data.detail || 'Something went wrong');
+      addAnswerBubble(data.summary, []);
+    } catch (err) {
+      thinkingEl.remove();
+      addErrorBubble(err.message);
+    } finally {
+      summarizeBtn.disabled = false;
+    }
+  });
+</script>
+
+</body>
+</html>
